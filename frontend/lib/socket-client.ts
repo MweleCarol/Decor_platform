@@ -20,8 +20,9 @@ export function connectSocket() {
 }
 
 export function disconnectSocket() {
-  if (socket?.connected) {
-    socket.disconnect();
-    socket = null;
+    if (socket) {
+     socket.disconnect();
+     socket = null;
   }
+ 
 }

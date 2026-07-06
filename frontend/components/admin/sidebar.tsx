@@ -76,7 +76,9 @@ export function AdminSidebar() {
           </div>
         </div>
         <button
-          onClick={() => logout()}
+           onClick={() => {
+            logout().catch(() => {});
+          }}
           className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-stone-400 hover:bg-stone-800 hover:text-white transition-colors"
         >
           <LogOut size={15} />

@@ -1,4 +1,9 @@
 {
+  "/(auth)/login/page": "app/(auth)/login/page.js",
+  "/(storefront)/products/page": "app/(storefront)/products/page.js",
+  "/(storefront)/account/page": "app/(storefront)/account/page.js",
+  "/admin/page": "app/admin/page.js",
   "/admin/chats/page": "app/admin/chats/page.js",
-  "/admin/page": "app/admin/page.js"
+  "/(storefront)/page": "app/(storefront)/page.js",
+  "/admin/products/page": "app/admin/products/page.js"
 }
