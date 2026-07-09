@@ -1,9 +1,9 @@
 {
+  "/_not-found/page": "app/_not-found/page.js",
   "/(auth)/login/page": "app/(auth)/login/page.js",
-  "/(storefront)/products/page": "app/(storefront)/products/page.js",
-  "/(storefront)/account/page": "app/(storefront)/account/page.js",
-  "/admin/page": "app/admin/page.js",
+  "/(storefront)/messages/page": "app/(storefront)/messages/page.js",
+  "/admin/categories/page": "app/admin/categories/page.js",
   "/admin/chats/page": "app/admin/chats/page.js",
-  "/(storefront)/page": "app/(storefront)/page.js",
-  "/admin/products/page": "app/admin/products/page.js"
+  "/admin/users/page": "app/admin/users/page.js",
+  "/admin/analytics/page": "app/admin/analytics/page.js"
 }
