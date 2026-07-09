@@ -61,8 +61,12 @@ export default function AdminChatsPage() {
   // Load messages when conversation selected
   useEffect(() => {
     if (!activeId) return;
-    api.get(`/api/chat/conversations/${activeId}/messages?pageSize=50`)
-      .then(({ data }) => setMessages(data.messages ?? []));
+     let ignore = false;
+  setMessages([]);
+  api.get(`/api/chat/conversations/${activeId}/messages?pageSize=50`)
+   .then(({ data }) => { if (!ignore) setMessages(data.messages ?? []); })
+    .catch((err) => { if (!ignore) console.error(err); });
+  return () => { ignore = true; };
   }, [activeId]);
 
   // Socket.IO setup
