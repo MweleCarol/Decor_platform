@@ -4,28 +4,36 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Mail, Lock, User, Phone } from "lucide-react";
-import { api } from "@/lib/api-client";
-import { useAuthStore } from "@/stores/auth.store";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
 
+import { useAuthStore } from "@/stores/auth.store";
+
 export default function RegisterPage() {
-  const router            = useRouter();
-  const { login }         = useAuthStore();
+  const router = useRouter();
+  const { register } = useAuthStore();
+
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [form, setForm]   = useState({
-    fullName: "", email: "", phone: "", password: "", confirmPassword: "",
+  const [form, setForm] = useState({
+    fullName: "",
+    email: "",
+    phone: "",
+    password: "",
+    confirmPassword: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   function validate() {
     const e: Record<string, string> = {};
     if (!form.fullName.trim()) e.fullName = "Full name is required";
-    if (!form.email)           e.email    = "Email is required";
-    if (form.password.length < 8) e.password = "Password must be at least 8 characters";
-    if (form.password !== form.confirmPassword) e.confirmPassword = "Passwords do not match";
+    if (!form.email) e.email = "Email is required";
+    if (form.password.length < 8)
+      e.password = "Password must be at least 8 characters";
+    if (form.password !== form.confirmPassword)
+      e.confirmPassword = "Passwords do not match";
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -35,18 +43,19 @@ export default function RegisterPage() {
     if (!validate()) return;
     setLoading(true);
     try {
-      await api.post("/api/auth/register", {
+      await register({
         fullName: form.fullName,
-        email:    form.email,
-        phone:    form.phone || undefined,
+        email: form.email,
+        phone: form.phone || undefined,
         password: form.password,
       });
-      // Auto-login after registration
-      await login(form.email, form.password);
+
       toast.success("Account created! Welcome to Decor Platform.");
       router.push("/");
     } catch (err: any) {
-      toast.error(err?.response?.data?.error ?? "Registration failed. Please try again.");
+      toast.error(
+        err?.response?.data?.error ?? "Registration failed. Please try again.",
+      );
     } finally {
       setLoading(false);
     }
@@ -62,7 +71,9 @@ export default function RegisterPage() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <Link href="/">
-            <p className="font-display text-3xl text-stone-900">Decor Platform</p>
+            <p className="font-display text-3xl text-stone-900">
+              Decor Platform
+            </p>
           </Link>
           <p className="text-stone-500 text-sm mt-1">Create your account</p>
         </div>
@@ -97,9 +108,14 @@ export default function RegisterPage() {
 
             {/* Password */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-stone-700">Password</label>
+              <label className="text-sm font-medium text-stone-700">
+                Password
+              </label>
               <div className="relative">
-                <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+                <Lock
+                  size={14}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400"
+                />
                 <input
                   type={showPassword ? "text" : "password"}
                   placeholder="Min. 8 characters"
@@ -115,7 +131,9 @@ export default function RegisterPage() {
                   {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
               </div>
-              {errors.password && <p className="text-xs text-red-500">{errors.password}</p>}
+              {errors.password && (
+                <p className="text-xs text-red-500">{errors.password}</p>
+              )}
             </div>
 
             <Input
@@ -128,7 +146,12 @@ export default function RegisterPage() {
               icon={<Lock size={14} />}
             />
 
-            <Button type="submit" className="w-full mt-2" size="lg" loading={loading}>
+            <Button
+              type="submit"
+              className="w-full mt-2"
+              size="lg"
+              loading={loading}
+            >
               Create Account
             </Button>
           </form>
@@ -141,7 +164,10 @@ export default function RegisterPage() {
           <div className="mt-5 text-center">
             <p className="text-sm text-stone-500">
               Already have an account?{" "}
-              <Link href="/login" className="text-gold-600 hover:text-gold-700 font-medium">
+              <Link
+                href="/login"
+                className="text-gold-600 hover:text-gold-700 font-medium"
+              >
                 Sign in
               </Link>
             </p>

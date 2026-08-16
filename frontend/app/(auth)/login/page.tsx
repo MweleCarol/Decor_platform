@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
 
 export default function LoginPage() {
-  const router          = useRouter();
+  const router = useRouter();
   const { login, isLoading } = useAuthStore();
   const [showPassword, setShowPassword] = useState(false);
   const [form, setForm] = useState({ email: "", password: "" });
@@ -18,7 +18,7 @@ export default function LoginPage() {
 
   function validate() {
     const e: Record<string, string> = {};
-    if (!form.email)    e.email    = "Email is required";
+    if (!form.email) e.email = "Email is required";
     if (!form.password) e.password = "Password is required";
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -30,7 +30,8 @@ export default function LoginPage() {
     try {
       await login(form.email, form.password);
       toast.success("Welcome back!");
-      router.push("/");
+      const loggedInUser = useAuthStore.getState().user;
+      router.push(loggedInUser?.role === "ADMIN" ? "/admin" : "/");
     } catch (err: any) {
       toast.error(err?.response?.data?.error ?? "Invalid email or password");
     }
@@ -42,7 +43,9 @@ export default function LoginPage() {
         {/* Logo */}
         <div className="text-center mb-8">
           <Link href="/">
-            <p className="font-display text-3xl text-stone-900">Decor Platform</p>
+            <p className="font-display text-3xl text-stone-900">
+              Decor Platform
+            </p>
           </Link>
           <p className="text-stone-500 text-sm mt-1">Sign in to your account</p>
         </div>
@@ -61,18 +64,28 @@ export default function LoginPage() {
 
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-stone-700">Password</label>
-                <Link href="/reset-password" className="text-xs text-gold-600 hover:text-gold-700">
+                <label className="text-sm font-medium text-stone-700">
+                  Password
+                </label>
+                <Link
+                  href="/reset-password"
+                  className="text-xs text-gold-600 hover:text-gold-700"
+                >
                   Forgot password?
                 </Link>
               </div>
               <div className="relative">
-                <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+                <Lock
+                  size={14}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400"
+                />
                 <input
                   type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
                   value={form.password}
-                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, password: e.target.value })
+                  }
                   className="w-full pl-9 pr-10 py-2.5 text-sm border rounded-lg bg-white outline-none transition-colors focus:ring-2 focus:ring-gold-400/30 focus:border-gold-400 border-stone-300"
                 />
                 <button
@@ -83,10 +96,17 @@ export default function LoginPage() {
                   {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
               </div>
-              {errors.password && <p className="text-xs text-red-500">{errors.password}</p>}
+              {errors.password && (
+                <p className="text-xs text-red-500">{errors.password}</p>
+              )}
             </div>
 
-            <Button type="submit" className="w-full" size="lg" loading={isLoading}>
+            <Button
+              type="submit"
+              className="w-full"
+              size="lg"
+              loading={isLoading}
+            >
               Sign In
             </Button>
           </form>
@@ -94,7 +114,10 @@ export default function LoginPage() {
           <div className="mt-6 text-center">
             <p className="text-sm text-stone-500">
               Don't have an account?{" "}
-              <Link href="/register" className="text-gold-600 hover:text-gold-700 font-medium">
+              <Link
+                href="/register"
+                className="text-gold-600 hover:text-gold-700 font-medium"
+              >
                 Create one
               </Link>
             </p>

@@ -160,7 +160,7 @@ export function CustomizerForm({ onSubmit, loading }: CustomizerFormProps) {
             onChange={(e) => setWidth(e.target.value)}
           />
           <Input
-            label="Height / Length"
+            label="Height"
             type="number"
             placeholder="e.g. 250"
             value={height}

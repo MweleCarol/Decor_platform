@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
+
 import { Send, Paperclip, MessageSquare, Circle } from "lucide-react";
-import { api } from "@/lib/api-client";
+
 import { connectSocket, disconnectSocket } from "@/lib/socket-client";
 import { useAuthStore } from "@/stores/auth.store";
 import { formatRelativeTime, cn } from "@/lib/utils";
+
+import { useAdminConversations } from "@/hooks/use-admin";
 
 interface Message {
   id: string;
@@ -36,37 +38,50 @@ interface Conversation {
 }
 
 export default function AdminChatsPage() {
-  const { user }                            = useAuthStore();
-  const [activeId, setActiveId]             = useState<string | null>(null);
-  const [messages, setMessages]             = useState<Message[]>([]);
-  const [text, setText]                     = useState("");
-  const [typing, setTyping]                 = useState(false);
-  const [onlineUsers, setOnlineUsers]       = useState<Set<string>>(new Set());
-  const messagesEndRef                      = useRef<HTMLDivElement>(null);
-  const typingTimeoutRef                    = useRef<NodeJS.Timeout>();
+  const { user } = useAuthStore();
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [text, setText] = useState("");
+  const [typing, setTyping] = useState(false);
+  const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout>();
 
   // Load all conversations
-  const { data, isLoading } = useQuery<{ conversations: Conversation[] }>({
-    queryKey: ["admin", "conversations"],
-    queryFn: async () => {
-      const { data } = await api.get("/api/chat/conversations");
-      return data;
-    },
-    refetchInterval: 10000,
-  });
+  const { data, isLoading } = useAdminConversations();
 
   const conversations = data?.conversations ?? [];
   const active = conversations.find((c) => c.id === activeId);
 
+  const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK_DATA === "true";
+
   // Load messages when conversation selected
   useEffect(() => {
     if (!activeId) return;
-     let ignore = false;
-  setMessages([]);
-  api.get(`/api/chat/conversations/${activeId}/messages?pageSize=50`)
-   .then(({ data }) => { if (!ignore) setMessages(data.messages ?? []); })
-    .catch((err) => { if (!ignore) console.error(err); });
-  return () => { ignore = true; };
+    let ignore = false;
+    setMessages([]);
+
+    async function load() {
+      try {
+        if (USE_MOCK) {
+          const { getMockMessages } = await import("@/mock/chat");
+          const { messages } = await getMockMessages(activeId!);
+          if (!ignore) setMessages(messages);
+          return;
+        }
+        const { data } = await api.get(
+          `/api/chat/conversations/${activeId}/messages?pageSize=50`,
+        );
+        if (!ignore) setMessages(data.messages ?? []);
+      } catch (err) {
+        if (!ignore) console.error(err);
+      }
+    }
+    load();
+
+    return () => {
+      ignore = true;
+    };
   }, [activeId]);
 
   // Socket.IO setup
@@ -81,16 +96,22 @@ export default function AdminChatsPage() {
     });
 
     socket.on("typing:start", () => setTyping(true));
-    socket.on("typing:stop",  () => setTyping(false));
+    socket.on("typing:stop", () => setTyping(false));
 
-    socket.on("presence:online",  ({ userId }: { userId: string }) => {
+    socket.on("presence:online", ({ userId }: { userId: string }) => {
       setOnlineUsers((prev) => new Set([...prev, userId]));
     });
     socket.on("presence:offline", ({ userId }: { userId: string }) => {
-      setOnlineUsers((prev) => { const s = new Set(prev); s.delete(userId); return s; });
+      setOnlineUsers((prev) => {
+        const s = new Set(prev);
+        s.delete(userId);
+        return s;
+      });
     });
 
-    return () => { disconnectSocket(); };
+    return () => {
+      disconnectSocket();
+    };
   }, []);
 
   // Join conversation room when switching
@@ -110,7 +131,10 @@ export default function AdminChatsPage() {
   function sendMessage() {
     if (!text.trim() || !activeId) return;
     const socket = connectSocket();
-    socket.emit("message:send", { conversationId: activeId, content: text.trim() });
+    socket.emit("message:send", {
+      conversationId: activeId,
+      content: text.trim(),
+    });
     setText("");
   }
 
@@ -133,19 +157,23 @@ export default function AdminChatsPage() {
 
   return (
     <div className="flex h-screen">
-
       {/* Conversation list */}
       <aside className="w-72 shrink-0 border-r border-stone-200 bg-white flex flex-col">
         <div className="px-5 py-4 border-b border-stone-100">
           <h1 className="font-semibold text-stone-800">Messages</h1>
-          <p className="text-xs text-stone-400 mt-0.5">{conversations.length} conversations</p>
+          <p className="text-xs text-stone-400 mt-0.5">
+            {conversations.length} conversations
+          </p>
         </div>
 
         <div className="flex-1 overflow-y-auto">
           {isLoading ? (
             <div className="space-y-1 p-2">
               {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="flex items-center gap-3 p-3 animate-pulse">
+                <div
+                  key={i}
+                  className="flex items-center gap-3 p-3 animate-pulse"
+                >
                   <div className="w-9 h-9 rounded-full bg-stone-200 shrink-0" />
                   <div className="flex-1 space-y-1.5">
                     <div className="h-3 bg-stone-200 rounded w-3/4" />
@@ -169,7 +197,7 @@ export default function AdminChatsPage() {
                   onClick={() => setActiveId(conv.id)}
                   className={cn(
                     "w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors border-b border-stone-50",
-                    activeId === conv.id ? "bg-gold-50" : "hover:bg-stone-50"
+                    activeId === conv.id ? "bg-gold-50" : "hover:bg-stone-50",
                   )}
                 >
                   {/* Avatar */}
@@ -213,7 +241,9 @@ export default function AdminChatsPage() {
         {!activeId ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center">
             <MessageSquare size={40} className="text-stone-300" />
-            <p className="text-stone-400 text-sm">Select a conversation to start chatting</p>
+            <p className="text-stone-400 text-sm">
+              Select a conversation to start chatting
+            </p>
           </div>
         ) : (
           <>
@@ -224,11 +254,16 @@ export default function AdminChatsPage() {
                   {active?.customer.fullName.charAt(0)}
                 </div>
                 {active && onlineUsers.has(active.customer.id) && (
-                  <Circle size={8} className="absolute bottom-0 right-0 text-emerald-500 fill-emerald-400" />
+                  <Circle
+                    size={8}
+                    className="absolute bottom-0 right-0 text-emerald-500 fill-emerald-400"
+                  />
                 )}
               </div>
               <div>
-                <p className="font-semibold text-stone-800">{active?.customer.fullName}</p>
+                <p className="font-semibold text-stone-800">
+                  {active?.customer.fullName}
+                </p>
                 <p className="text-xs text-stone-400">
                   {active && onlineUsers.has(active.customer.id) ? (
                     <span className="text-emerald-500">Online</span>
@@ -246,7 +281,10 @@ export default function AdminChatsPage() {
                 return (
                   <div
                     key={msg.id}
-                    className={cn("flex gap-2.5 max-w-[75%]", isAdmin ? "ml-auto flex-row-reverse" : "")}
+                    className={cn(
+                      "flex gap-2.5 max-w-[75%]",
+                      isAdmin ? "ml-auto flex-row-reverse" : "",
+                    )}
                   >
                     {!isAdmin && (
                       <div className="w-7 h-7 rounded-full bg-gold-100 text-gold-700 text-xs font-bold flex items-center justify-center shrink-0 mt-auto">
@@ -259,7 +297,7 @@ export default function AdminChatsPage() {
                           "px-4 py-2.5 rounded-2xl text-sm leading-relaxed",
                           isAdmin
                             ? "bg-stone-900 text-white rounded-tr-sm"
-                            : "bg-white border border-stone-200 text-stone-800 rounded-tl-sm"
+                            : "bg-white border border-stone-200 text-stone-800 rounded-tl-sm",
                         )}
                       >
                         {msg.content}
@@ -274,9 +312,16 @@ export default function AdminChatsPage() {
                           </a>
                         )}
                       </div>
-                      <p className={cn("text-[10px] text-stone-400 mt-1", isAdmin ? "text-right" : "")}>
+                      <p
+                        className={cn(
+                          "text-[10px] text-stone-400 mt-1",
+                          isAdmin ? "text-right" : "",
+                        )}
+                      >
                         {formatRelativeTime(msg.createdAt)}
-                        {isAdmin && msg.readAt && <span className="ml-1">· Read</span>}
+                        {isAdmin && msg.readAt && (
+                          <span className="ml-1">· Read</span>
+                        )}
                       </p>
                     </div>
                   </div>
@@ -305,7 +350,10 @@ export default function AdminChatsPage() {
               <div className="flex items-end gap-2">
                 <textarea
                   value={text}
-                  onChange={(e) => { setText(e.target.value); handleTyping(); }}
+                  onChange={(e) => {
+                    setText(e.target.value);
+                    handleTyping();
+                  }}
                   onKeyDown={handleKeyDown}
                   placeholder="Type a message… (Enter to send)"
                   rows={1}

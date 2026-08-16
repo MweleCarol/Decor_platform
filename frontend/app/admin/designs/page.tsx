@@ -1,23 +1,20 @@
 "use client";
 
 import Image from "next/image";
-import { useQuery } from "@tanstack/react-query";
+
 import { Sparkles, ExternalLink } from "lucide-react";
-import { api } from "@/lib/api-client";
+
+
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate, formatCurrency } from "@/lib/utils";
+import { useAdminDesigns } from "@/hooks/use-admin";
 
 export default function AdminDesignsPage() {
-  const { data, isLoading } = useQuery({
-    queryKey: ["admin", "designs"],
-    queryFn: async () => {
-      const { data } = await api.get("/api/admin/designs");
-      return data;
-    },
-  });
 
+
+  const { data, isLoading } = useAdminDesigns();
   const designs = data?.designs ?? [];
 
   const statusVariant: Record<string, "success" | "warning" | "danger" | "default"> = {
