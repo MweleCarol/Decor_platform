@@ -5,9 +5,9 @@ import Link from "next/link";
 import { Heart, ShoppingCart, Star } from "lucide-react";
 import { useState } from "react";
 import { useCartStore } from "@/stores/cart.store";
-import { api } from "@/lib/api-client";
 import { toast } from "@/components/ui/toast";
 import { formatCurrency, cn } from "@/lib/utils";
+import { useWishlistStore } from "@/stores/wishlist.store";
 
 interface Product {
   id: string;
@@ -28,17 +28,22 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product }: ProductCardProps) {
-  const [wishlisted, setWishlisted] = useState(false);
   const [addingToCart, setAddingToCart] = useState(false);
   const { addItem } = useCartStore();
 
   const totalStock = product.variants.reduce((s, v) => s + v.stock, 0);
-  const inStock    = totalStock > 0;
-  const image      = product.images[0];
+  const inStock = totalStock > 0;
+  const image = product.images[0];
+  const {
+    isWishlisted,
+    addItem: addWishlistItem,
+    removeItem: removeWishlistItem,
+  } = useWishlistStore();
+  const wishlisted = isWishlisted(product.id);
 
   async function handleAddToCart(e: React.MouseEvent) {
     e.preventDefault();
-    if (!inStock) return;
+    if (!inStock || addingToCart) return;
     setAddingToCart(true);
     try {
       await addItem(product.id);
@@ -54,23 +59,20 @@ export function ProductCard({ product }: ProductCardProps) {
     e.preventDefault();
     try {
       if (wishlisted) {
-        await api.delete(`/api/wishlist/${product.id}`);
-        setWishlisted(false);
+        await removeWishlistItem(product.id);
         toast.success("Removed from wishlist");
       } else {
-        await api.post("/api/wishlist", { productId: product.id });
-        setWishlisted(true);
+        await addWishlistItem(product.id);
         toast.success("Added to wishlist");
       }
-    } catch {
-      toast.error("Please log in to save items");
+    } catch (err: any) {
+      toast.error(err?.message ?? "Please log in to save items");
     }
   }
 
   return (
     <Link href={`/products/${product.slug}`} className="group block">
       <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden transition-shadow hover:shadow-lg">
-
         {/* Image */}
         <div className="relative aspect-[4/3] overflow-hidden bg-stone-100">
           {image ? (
@@ -79,7 +81,7 @@ export function ProductCard({ product }: ProductCardProps) {
               alt={image.altText ?? product.name}
               fill
               className="object-cover transition-transform duration-500 group-hover:scale-105"
-              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+              sizes="(max-width: 768px) 50vw, (max-width: 1280px) 33vw, 25vw"
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
@@ -106,49 +108,72 @@ export function ProductCard({ product }: ProductCardProps) {
             )}
           </div>
 
-          {/* Wishlist button */}
+          {/* Wishlist — always visible on mobile (no hover), hover-reveal on desktop */}
           <button
             onClick={handleWishlist}
+            aria-label={wishlisted ? "Remove from wishlist" : "Add to wishlist"}
+            aria-pressed={wishlisted}
             className={cn(
-              "absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center transition-all",
-              "opacity-0 group-hover:opacity-100",
+              "absolute top-3 right-3 w-9 h-9 rounded-full flex items-center justify-center transition-all",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400 focus-visible:ring-offset-2",
+              "opacity-100 md:opacity-0 md:group-hover:opacity-100",
               wishlisted
                 ? "bg-red-500 text-white"
-                : "bg-white/90 text-stone-500 hover:text-red-500"
+                : "bg-white/90 text-stone-500 hover:text-red-500",
             )}
           >
-            <Heart size={14} fill={wishlisted ? "currentColor" : "none"} />
+            <Heart size={15} fill={wishlisted ? "currentColor" : "none"} />
           </button>
 
-          {/* Add to cart overlay */}
+          {/* Mobile: small floating add-to-cart icon (no hover dependency) */}
+          <button
+            onClick={handleAddToCart}
+            disabled={!inStock || addingToCart}
+            aria-label={inStock ? "Add to cart" : "Out of stock"}
+            className={cn(
+              "md:hidden absolute bottom-3 right-3 w-10 h-10 rounded-full flex items-center justify-center shadow-modal transition-transform active:scale-95",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400 focus-visible:ring-offset-2",
+              inStock
+                ? "bg-stone-900 text-white"
+                : "bg-stone-300 text-stone-500",
+            )}
+          >
+            <ShoppingCart size={16} />
+          </button>
+
+          {/* Desktop: full-width reveal-on-hover bar (mouse users get real hover) */}
           <button
             onClick={handleAddToCart}
             disabled={!inStock || addingToCart}
             className={cn(
-              "absolute bottom-0 left-0 right-0 py-3 text-sm font-medium transition-all duration-300",
+              "hidden md:block absolute bottom-0 left-0 right-0 py-3 text-sm font-medium transition-all duration-300",
               "translate-y-full group-hover:translate-y-0",
               inStock
                 ? "bg-stone-900 text-white hover:bg-stone-800"
-                : "bg-stone-300 text-stone-500 cursor-not-allowed"
+                : "bg-stone-300 text-stone-500 cursor-not-allowed",
             )}
           >
-            {addingToCart ? "Adding…" : inStock ? "Add to Cart" : "Out of Stock"}
+            {addingToCart
+              ? "Adding…"
+              : inStock
+                ? "Add to Cart"
+                : "Out of Stock"}
           </button>
         </div>
 
         {/* Info */}
-        <div className="p-4">
+        <div className="p-3 sm:p-4">
           <p className="text-xs text-stone-400 mb-1">{product.category.name}</p>
           <p className="text-sm font-semibold text-stone-800 line-clamp-2 leading-snug">
             {product.name}
           </p>
 
-          <div className="flex items-center justify-between mt-2.5">
+          <div className="flex items-center justify-between mt-2.5 gap-2">
             <p className="text-base font-bold text-stone-900">
               {formatCurrency(Number(product.basePrice))}
             </p>
             {product.reviewCount > 0 && (
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 shrink-0">
                 <Star size={11} className="text-gold-500 fill-gold-400" />
                 <span className="text-xs text-stone-500">
                   {Number(product.rating).toFixed(1)} ({product.reviewCount})

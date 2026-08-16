@@ -8,7 +8,9 @@ interface ProductsPageProps {
 
 export const metadata = { title: "Shop" };
 
-export default async function ProductsPage({ searchParams }: ProductsPageProps) {
+export default async function ProductsPage({
+  searchParams,
+}: ProductsPageProps) {
   const { category, search } = await searchParams;
 
   return (
@@ -17,29 +19,29 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       <div className="mb-8">
         <h1 className="font-display text-4xl font-bold text-stone-900">
           {category
-            ? category.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+            ? category
+                .replace(/-/g, " ")
+                .replace(/\b\w/g, (c) => c.toUpperCase())
             : "All Products"}
         </h1>
         {search && (
           <p className="text-stone-500 mt-1">
-            Search results for <span className="font-medium text-stone-800">"{search}"</span>
+            Search results for{" "}
+            <span className="font-medium text-stone-800">"{search}"</span>
           </p>
         )}
       </div>
 
       <Suspense
         fallback={
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-5">
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-5">
             {Array.from({ length: 12 }).map((_, i) => (
               <ProductCardSkeleton key={i} />
             ))}
           </div>
         }
       >
-        <ProductGrid
-          initialCategory={category}
-          initialSearch={search}
-        />
+        <ProductGrid initialCategory={category} initialSearch={search} />
       </Suspense>
     </div>
   );

@@ -3,8 +3,18 @@
 import { useState, useRef } from "react";
 import Image from "next/image";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Pencil, Trash2, Star, Package, Upload, ImagePlus, X } from "lucide-react";
-import { api } from "@/lib/api-client";
+import {
+  Plus,
+  Search,
+  Pencil,
+  Trash2,
+  Star,
+  Package,
+  Upload,
+  ImagePlus,
+  X,
+} from "lucide-react";
+
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea, Select } from "@/components/ui/input";
@@ -13,6 +23,18 @@ import { Modal } from "@/components/ui/modal";
 import { TableRowSkeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
 import { formatCurrency } from "@/lib/utils";
+
+import { api } from "@/lib/api-client";
+import { useCategories as useSharedCategories } from "@/hooks/use-products";
+import {
+  getMockProducts,
+  createMockProduct,
+  updateMockProduct,
+  deleteMockProduct,
+} from "@/mock/product";
+import { ProductPreviewCard } from "@/components/admin/product-preview-card";
+
+const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK_DATA === "true";
 
 interface Product {
   id: string;
@@ -28,11 +50,19 @@ interface Product {
   variants: { stock: number }[];
 }
 
-interface Category { id: string; name: string; }
+interface Category {
+  id: string;
+  name: string;
+}
 
 const EMPTY_FORM = {
-  name: "", description: "", basePrice: "", material: "",
-  categoryId: "", isFeatured: false, isBestSeller: false,
+  name: "",
+  description: "",
+  basePrice: "",
+  material: "",
+  categoryId: "",
+  isFeatured: false,
+  isBestSeller: false,
   variants: [{ color: "", size: "", sku: "", priceDelta: "0", stock: "0" }],
 };
 
@@ -40,18 +70,17 @@ function useProducts(search: string, page: number) {
   return useQuery({
     queryKey: ["admin", "products", search, page],
     queryFn: async () => {
-      const params = new URLSearchParams({ page: String(page), pageSize: "20" });
+      if (USE_MOCK) {
+        return getMockProducts({ search, page, pageSize: 20, sort: "newest" });
+      }
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: "20",
+      });
       if (search) params.set("search", search);
       const { data } = await api.get(`/api/products?${params}`);
       return data;
     },
-  });
-}
-
-function useCategories() {
-  return useQuery<{ categories: Category[] }>({
-    queryKey: ["categories"],
-    queryFn: async () => { const { data } = await api.get("/api/categories"); return data; },
   });
 }
 
@@ -67,10 +96,10 @@ function ImageUploadModal({
   existingImages: { url: string }[];
   onClose: () => void;
 }) {
-  const fileRef             = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [previews, setPreviews] = useState<{ file: File; url: string }[]>([]);
   const [uploading, setUploading] = useState(false);
-  const queryClient         = useQueryClient();
+  const queryClient = useQueryClient();
 
   function handleFiles(files: FileList | null) {
     if (!files) return;
@@ -93,11 +122,15 @@ function ImageUploadModal({
           headers: { "Content-Type": "multipart/form-data" },
         });
       }
-      toast.success(`${previews.length} image${previews.length > 1 ? "s" : ""} uploaded`);
+      toast.success(
+        `${previews.length} image${previews.length > 1 ? "s" : ""} uploaded`,
+      );
       queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
       onClose();
     } catch {
-      toast.error("Failed to upload images. Make sure Cloudinary is configured.");
+      toast.error(
+        "Failed to upload images. Make sure Cloudinary is configured.",
+      );
     } finally {
       setUploading(false);
     }
@@ -106,7 +139,6 @@ function ImageUploadModal({
   return (
     <Modal open onClose={onClose} title={`Images — ${productName}`} size="lg">
       <div className="space-y-5">
-
         {/* Existing images */}
         {existingImages.length > 0 && (
           <div>
@@ -115,8 +147,16 @@ function ImageUploadModal({
             </p>
             <div className="flex gap-2 flex-wrap">
               {existingImages.map((img, i) => (
-                <div key={i} className="relative w-20 h-20 rounded-xl overflow-hidden border border-stone-200">
-                  <Image src={img.url} alt={`Image ${i + 1}`} fill className="object-cover" />
+                <div
+                  key={i}
+                  className="relative w-20 h-20 rounded-xl overflow-hidden border border-stone-200"
+                >
+                  <Image
+                    src={img.url}
+                    alt={`Image ${i + 1}`}
+                    fill
+                    className="object-cover"
+                  />
                 </div>
               ))}
             </div>
@@ -128,11 +168,18 @@ function ImageUploadModal({
           onClick={() => fileRef.current?.click()}
           className="border-2 border-dashed border-stone-300 hover:border-gold-400 rounded-2xl p-8 text-center cursor-pointer transition-colors"
           onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => { e.preventDefault(); handleFiles(e.dataTransfer.files); }}
+          onDrop={(e) => {
+            e.preventDefault();
+            handleFiles(e.dataTransfer.files);
+          }}
         >
           <ImagePlus size={28} className="text-stone-400 mx-auto mb-2" />
-          <p className="text-sm text-stone-600 font-medium">Click or drag images here</p>
-          <p className="text-xs text-stone-400 mt-1">JPG, PNG, WebP — multiple files allowed</p>
+          <p className="text-sm text-stone-600 font-medium">
+            Click or drag images here
+          </p>
+          <p className="text-xs text-stone-400 mt-1">
+            JPG, PNG, WebP — multiple files allowed
+          </p>
           <input
             ref={fileRef}
             type="file"
@@ -151,10 +198,15 @@ function ImageUploadModal({
             </p>
             <div className="flex gap-2 flex-wrap">
               {previews.map((p, i) => (
-                <div key={i} className="relative w-20 h-20 rounded-xl overflow-hidden border border-stone-200 group">
+                <div
+                  key={i}
+                  className="relative w-20 h-20 rounded-xl overflow-hidden border border-stone-200 group"
+                >
                   <Image src={p.url} alt="" fill className="object-cover" />
                   <button
-                    onClick={() => setPreviews((prev) => prev.filter((_, j) => j !== i))}
+                    onClick={() =>
+                      setPreviews((prev) => prev.filter((_, j) => j !== i))
+                    }
                     className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
                   >
                     <X size={16} className="text-white" />
@@ -166,14 +218,19 @@ function ImageUploadModal({
         )}
 
         <div className="flex justify-end gap-3 pt-2">
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
           <Button
             icon={<Upload size={14} />}
             loading={uploading}
             disabled={!previews.length}
             onClick={handleUpload}
           >
-            Upload {previews.length > 0 ? `${previews.length} Image${previews.length > 1 ? "s" : ""}` : "Images"}
+            Upload{" "}
+            {previews.length > 0
+              ? `${previews.length} Image${previews.length > 1 ? "s" : ""}`
+              : "Images"}
           </Button>
         </div>
       </div>
@@ -183,20 +240,21 @@ function ImageUploadModal({
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function AdminProductsPage() {
-  const [search, setSearch]       = useState("");
-  const [page, setPage]           = useState(1);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
-  const [editId, setEditId]       = useState<string | null>(null);
-  const [form, setForm]           = useState(EMPTY_FORM);
-  const [deleteId, setDeleteId]   = useState<string | null>(null);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
   const [imageProduct, setImageProduct] = useState<Product | null>(null);
+  const [previewImages, setPreviewImages] = useState<{ url: string }[]>([]);
+  const formFileRef = useRef<HTMLInputElement>(null);
 
-  const queryClient               = useQueryClient();
-  const { data, isLoading }       = useProducts(search, page);
-  const { data: catData }         = useCategories();
-  const categories                = catData?.categories ?? [];
-  const products: Product[]       = data?.items ?? [];
-  const pagination                = data?.pagination;
+  const queryClient = useQueryClient();
+  const { data, isLoading } = useProducts(search, page);
+  const { data: categories = [] } = useSharedCategories();
+  const products: Product[] = data?.items ?? [];
+  const pagination = data?.pagination;
 
   const saveMutation = useMutation({
     mutationFn: async (body: typeof EMPTY_FORM) => {
@@ -208,7 +266,13 @@ export default function AdminProductsPage() {
           priceDelta: Number(v.priceDelta),
           stock: Number(v.stock),
         })),
+        images: previewImages,
       };
+      if (USE_MOCK) {
+        return editId
+          ? updateMockProduct(editId, payload)
+          : createMockProduct(payload);
+      }
       if (editId) {
         await api.patch(`/api/products/${editId}`, payload);
       } else {
@@ -217,16 +281,20 @@ export default function AdminProductsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
-      toast.success(editId ? "Product updated" : "Product created — you can now add images");
+      toast.success(
+        editId ? "Product updated" : "Product created — you can now add images",
+      );
       setShowModal(false);
       setForm(EMPTY_FORM);
+      setPreviewImages([]);
       setEditId(null);
     },
     onError: () => toast.error("Failed to save product"),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: string) => api.delete(`/api/products/${id}`),
+    mutationFn: async (id: string) =>
+      USE_MOCK ? deleteMockProduct(id) : api.delete(`/api/products/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
       toast.success("Product deleted");
@@ -234,18 +302,39 @@ export default function AdminProductsPage() {
     },
     onError: () => toast.error("Failed to delete product"),
   });
-
-  function openCreate() { setForm(EMPTY_FORM); setEditId(null); setShowModal(true); }
+  function openCreate() {
+    setForm(EMPTY_FORM);
+    setPreviewImages([]);
+    setEditId(null);
+    setShowModal(true);
+  }
 
   function openEdit(p: Product) {
     setForm({
-      name: p.name, description: "", basePrice: String(p.basePrice),
-      material: "", categoryId: "",
-      isFeatured: p.isFeatured, isBestSeller: p.isBestSeller,
+      name: p.name,
+      description: "",
+      basePrice: String(p.basePrice),
+      material: "",
+      categoryId: "",
+      isFeatured: p.isFeatured,
+      isBestSeller: p.isBestSeller,
       variants: [{ color: "", size: "", sku: "", priceDelta: "0", stock: "0" }],
     });
+    setPreviewImages(p.images.map((img) => ({ url: img.url })));
     setEditId(p.id);
     setShowModal(true);
+  }
+
+  function handleFormImages(files: FileList | null) {
+    if (!files) return;
+    const newOnes = Array.from(files).map((file) => ({
+      url: URL.createObjectURL(file),
+    }));
+    setPreviewImages((prev) => [...prev, ...newOnes]);
+  }
+
+  function removeFormImage(index: number) {
+    setPreviewImages((prev) => prev.filter((_, i) => i !== index));
   }
 
   const totalStock = (variants: { stock: number }[]) =>
@@ -253,14 +342,19 @@ export default function AdminProductsPage() {
 
   return (
     <div className="p-6 lg:p-8 max-w-screen-2xl mx-auto space-y-6">
-
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-stone-900 font-display">Products</h1>
-          <p className="text-sm text-stone-500 mt-0.5">{pagination?.total ?? 0} listings</p>
+          <h1 className="text-2xl font-bold text-stone-900 font-display">
+            Products
+          </h1>
+          <p className="text-sm text-stone-500 mt-0.5">
+            {pagination?.total ?? 0} listings
+          </p>
         </div>
-        <Button icon={<Plus size={15} />} onClick={openCreate}>Add Product</Button>
+        <Button icon={<Plus size={15} />} onClick={openCreate}>
+          Add Product
+        </Button>
       </div>
 
       {/* Search */}
@@ -268,7 +362,10 @@ export default function AdminProductsPage() {
         <Input
           placeholder="Search products…"
           value={search}
-          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPage(1);
+          }}
           icon={<Search size={14} />}
         />
       </div>
@@ -280,24 +377,48 @@ export default function AdminProductsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-stone-100">
-                  {["Product","Category","Price","Stock","Rating","Tags","Images","Actions"].map((h) => (
-                    <th key={h} className="text-left text-xs font-medium text-stone-500 px-5 py-3.5">{h}</th>
+                  {[
+                    "Product",
+                    "Category",
+                    "Price",
+                    "Stock",
+                    "Rating",
+                    "Tags",
+                    "Images",
+                    "Actions",
+                  ].map((h) => (
+                    <th
+                      key={h}
+                      className="text-left text-xs font-medium text-stone-500 px-5 py-3.5"
+                    >
+                      {h}
+                    </th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-50">
                 {isLoading ? (
-                  Array.from({ length: 6 }).map((_, i) => <TableRowSkeleton key={i} cols={8} />)
+                  Array.from({ length: 6 }).map((_, i) => (
+                    <TableRowSkeleton key={i} cols={8} />
+                  ))
                 ) : products.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="px-5 py-16 text-center">
-                      <Package size={32} className="text-stone-300 mx-auto mb-2" />
-                      <p className="text-sm text-stone-400">No products found</p>
+                      <Package
+                        size={32}
+                        className="text-stone-300 mx-auto mb-2"
+                      />
+                      <p className="text-sm text-stone-400">
+                        No products found
+                      </p>
                     </td>
                   </tr>
                 ) : (
                   products.map((p) => (
-                    <tr key={p.id} className="hover:bg-stone-50 transition-colors">
+                    <tr
+                      key={p.id}
+                      className="hover:bg-stone-50 transition-colors"
+                    >
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-3">
                           {/* Thumbnail */}
@@ -314,29 +435,50 @@ export default function AdminProductsPage() {
                               <Package size={14} className="text-stone-400" />
                             </div>
                           )}
-                          <p className="font-medium text-stone-800 max-w-[180px] truncate">{p.name}</p>
+                          <p className="font-medium text-stone-800 max-w-[180px] truncate">
+                            {p.name}
+                          </p>
                         </div>
                       </td>
-                      <td className="px-5 py-3.5 text-stone-600 text-xs">{p.category.name}</td>
+                      <td className="px-5 py-3.5 text-stone-600 text-xs">
+                        {p.category.name}
+                      </td>
                       <td className="px-5 py-3.5 font-semibold text-stone-800">
                         {formatCurrency(Number(p.basePrice))}
                       </td>
                       <td className="px-5 py-3.5">
-                        <span className={totalStock(p.variants) === 0 ? "text-red-500 text-sm" : "text-stone-700 text-sm"}>
+                        <span
+                          className={
+                            totalStock(p.variants) === 0
+                              ? "text-red-500 text-sm"
+                              : "text-stone-700 text-sm"
+                          }
+                        >
                           {totalStock(p.variants)} units
                         </span>
                       </td>
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-1">
-                          <Star size={12} className="text-gold-500 fill-gold-400" />
-                          <span className="text-stone-700 text-sm">{Number(p.rating).toFixed(1)}</span>
-                          <span className="text-stone-400 text-xs">({p.reviewCount})</span>
+                          <Star
+                            size={12}
+                            className="text-gold-500 fill-gold-400"
+                          />
+                          <span className="text-stone-700 text-sm">
+                            {Number(p.rating).toFixed(1)}
+                          </span>
+                          <span className="text-stone-400 text-xs">
+                            ({p.reviewCount})
+                          </span>
                         </div>
                       </td>
                       <td className="px-5 py-3.5">
                         <div className="flex gap-1.5 flex-wrap">
-                          {p.isFeatured   && <Badge variant="gold">Featured</Badge>}
-                          {p.isBestSeller && <Badge variant="success">Best Seller</Badge>}
+                          {p.isFeatured && (
+                            <Badge variant="gold">Featured</Badge>
+                          )}
+                          {p.isBestSeller && (
+                            <Badge variant="success">Best Seller</Badge>
+                          )}
                         </div>
                       </td>
 
@@ -347,7 +489,10 @@ export default function AdminProductsPage() {
                           className="flex items-center gap-1.5 text-xs text-stone-500 hover:text-gold-600 transition-colors"
                         >
                           <ImagePlus size={14} />
-                          <span>{p.images.length} photo{p.images.length !== 1 ? "s" : ""}</span>
+                          <span>
+                            {p.images.length} photo
+                            {p.images.length !== 1 ? "s" : ""}
+                          </span>
                         </button>
                       </td>
 
@@ -383,10 +528,20 @@ export default function AdminProductsPage() {
                 Page {pagination.page} of {pagination.totalPages}
               </p>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                >
                   Previous
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => setPage((p) => p + 1)} disabled={page === pagination.totalPages}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => p + 1)}
+                  disabled={page === pagination.totalPages}
+                >
                   Next
                 </Button>
               </div>
@@ -398,7 +553,10 @@ export default function AdminProductsPage() {
       {/* Create / Edit Modal */}
       <Modal
         open={showModal}
-        onClose={() => { setShowModal(false); setEditId(null); }}
+        onClose={() => {
+          setShowModal(false);
+          setEditId(null);
+        }}
         title={editId ? "Edit Product" : "New Product"}
         size="xl"
       >
@@ -447,15 +605,23 @@ export default function AdminProductsPage() {
 
           <div className="flex gap-6">
             <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={form.isFeatured}
-                onChange={(e) => setForm({ ...form, isFeatured: e.target.checked })}
+              <input
+                type="checkbox"
+                checked={form.isFeatured}
+                onChange={(e) =>
+                  setForm({ ...form, isFeatured: e.target.checked })
+                }
                 className="w-4 h-4 accent-gold-500"
               />
               <span className="text-sm text-stone-700">Featured</span>
             </label>
             <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={form.isBestSeller}
-                onChange={(e) => setForm({ ...form, isBestSeller: e.target.checked })}
+              <input
+                type="checkbox"
+                checked={form.isBestSeller}
+                onChange={(e) =>
+                  setForm({ ...form, isBestSeller: e.target.checked })
+                }
                 className="w-4 h-4 accent-gold-500"
               />
               <span className="text-sm text-stone-700">Best Seller</span>
@@ -467,20 +633,71 @@ export default function AdminProductsPage() {
             <p className="text-sm font-medium text-stone-700 mb-2">Variants</p>
             {form.variants.map((v, i) => (
               <div key={i} className="grid grid-cols-5 gap-2 mb-2">
-                <Input placeholder="Color" value={v.color}
-                  onChange={(e) => { const vs = [...form.variants]; vs[i].color = e.target.value; setForm({ ...form, variants: vs }); }} />
-                <Input placeholder="Size" value={v.size}
-                  onChange={(e) => { const vs = [...form.variants]; vs[i].size = e.target.value; setForm({ ...form, variants: vs }); }} />
-                <Input placeholder="SKU" value={v.sku}
-                  onChange={(e) => { const vs = [...form.variants]; vs[i].sku = e.target.value; setForm({ ...form, variants: vs }); }} />
-                <Input placeholder="Price +" type="number" value={v.priceDelta}
-                  onChange={(e) => { const vs = [...form.variants]; vs[i].priceDelta = e.target.value; setForm({ ...form, variants: vs }); }} />
-                <Input placeholder="Stock" type="number" value={v.stock}
-                  onChange={(e) => { const vs = [...form.variants]; vs[i].stock = e.target.value; setForm({ ...form, variants: vs }); }} />
+                <Input
+                  placeholder="Color"
+                  value={v.color}
+                  onChange={(e) => {
+                    const vs = [...form.variants];
+                    vs[i].color = e.target.value;
+                    setForm({ ...form, variants: vs });
+                  }}
+                />
+                <Input
+                  placeholder="Size"
+                  value={v.size}
+                  onChange={(e) => {
+                    const vs = [...form.variants];
+                    vs[i].size = e.target.value;
+                    setForm({ ...form, variants: vs });
+                  }}
+                />
+                <Input
+                  placeholder="SKU"
+                  value={v.sku}
+                  onChange={(e) => {
+                    const vs = [...form.variants];
+                    vs[i].sku = e.target.value;
+                    setForm({ ...form, variants: vs });
+                  }}
+                />
+                <Input
+                  placeholder="Price +"
+                  type="number"
+                  value={v.priceDelta}
+                  onChange={(e) => {
+                    const vs = [...form.variants];
+                    vs[i].priceDelta = e.target.value;
+                    setForm({ ...form, variants: vs });
+                  }}
+                />
+                <Input
+                  placeholder="Stock"
+                  type="number"
+                  value={v.stock}
+                  onChange={(e) => {
+                    const vs = [...form.variants];
+                    vs[i].stock = e.target.value;
+                    setForm({ ...form, variants: vs });
+                  }}
+                />
               </div>
             ))}
             <button
-              onClick={() => setForm({ ...form, variants: [...form.variants, { color: "", size: "", sku: "", priceDelta: "0", stock: "0" }] })}
+              onClick={() =>
+                setForm({
+                  ...form,
+                  variants: [
+                    ...form.variants,
+                    {
+                      color: "",
+                      size: "",
+                      sku: "",
+                      priceDelta: "0",
+                      stock: "0",
+                    },
+                  ],
+                })
+              }
               className="text-xs text-gold-600 hover:text-gold-700 font-medium"
             >
               + Add variant
@@ -489,14 +706,97 @@ export default function AdminProductsPage() {
 
           {!editId && (
             <p className="text-xs text-stone-400 bg-stone-50 rounded-lg px-3 py-2">
-              💡 After creating the product, click the photo icon in the table to upload product images.
+              💡 After creating the product, click the photo icon in the table
+              to upload product images.
             </p>
           )}
+
+          <div className="grid grid-cols-[1fr_220px] gap-5 pt-2 border-t border-stone-100">
+            <div>
+              <p className="text-sm font-medium text-stone-700 mb-2">
+                Product Images
+              </p>
+              <div
+                onClick={() => formFileRef.current?.click()}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  handleFormImages(e.dataTransfer.files);
+                }}
+                className="border-2 border-dashed border-stone-300 hover:border-gold-400 rounded-xl p-5 text-center cursor-pointer transition-colors"
+              >
+                <ImagePlus
+                  size={22}
+                  className="text-stone-400 mx-auto mb-1.5"
+                />
+                <p className="text-xs text-stone-600 font-medium">
+                  Click or drag images here
+                </p>
+                <input
+                  ref={formFileRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => handleFormImages(e.target.files)}
+                />
+              </div>
+
+              {previewImages.length > 0 && (
+                <div className="flex gap-2 flex-wrap mt-3">
+                  {previewImages.map((img, i) => (
+                    <div
+                      key={i}
+                      className="relative w-16 h-16 rounded-lg overflow-hidden border border-stone-200 group"
+                    >
+                      <Image
+                        src={img.url}
+                        alt=""
+                        fill
+                        className="object-cover"
+                        unoptimized
+                      />
+                      <button
+                        onClick={() => removeFormImage(i)}
+                        className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
+                      >
+                        <X size={13} className="text-white" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <p className="text-[11px] text-stone-400 mt-2">
+                {USE_MOCK
+                  ? "Images attach when you save (mock mode)."
+                  : "Preview only here — upload real images after creating, via the photo icon in the table."}
+              </p>
+            </div>
+
+            <div className="flex justify-center">
+              <ProductPreviewCard
+                name={form.name}
+                categoryName={
+                  categories.find((c) => c.id === form.categoryId)?.name ?? ""
+                }
+                basePrice={Number(form.basePrice) || 0}
+                isFeatured={form.isFeatured}
+                isBestSeller={form.isBestSeller}
+                images={previewImages}
+              />
+            </div>
+          </div>
         </div>
 
         <div className="flex justify-end gap-3 pt-4 border-t border-stone-100 mt-4">
-          <Button variant="outline" onClick={() => setShowModal(false)}>Cancel</Button>
-          <Button loading={saveMutation.isPending} onClick={() => saveMutation.mutate(form)}>
+          <Button variant="outline" onClick={() => setShowModal(false)}>
+            Cancel
+          </Button>
+          <Button
+            loading={saveMutation.isPending}
+            onClick={() => saveMutation.mutate(form)}
+          >
             {editId ? "Save Changes" : "Create Product"}
           </Button>
         </div>
@@ -513,14 +813,25 @@ export default function AdminProductsPage() {
       )}
 
       {/* Delete Confirm */}
-      <Modal open={!!deleteId} onClose={() => setDeleteId(null)} title="Delete Product" size="sm">
+      <Modal
+        open={!!deleteId}
+        onClose={() => setDeleteId(null)}
+        title="Delete Product"
+        size="sm"
+      >
         <p className="text-sm text-stone-600 mb-6">
-          This permanently deletes the product and all its variants. This cannot be undone.
+          This permanently deletes the product and all its variants. This cannot
+          be undone.
         </p>
         <div className="flex justify-end gap-3">
-          <Button variant="outline" onClick={() => setDeleteId(null)}>Cancel</Button>
-          <Button variant="danger" loading={deleteMutation.isPending}
-            onClick={() => deleteId && deleteMutation.mutate(deleteId)}>
+          <Button variant="outline" onClick={() => setDeleteId(null)}>
+            Cancel
+          </Button>
+          <Button
+            variant="danger"
+            loading={deleteMutation.isPending}
+            onClick={() => deleteId && deleteMutation.mutate(deleteId)}
+          >
             Delete
           </Button>
         </div>
